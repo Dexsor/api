@@ -1,6 +1,7 @@
 const mongoose = require('./db');
 const Schemas = require('./schemas');
 
+
 // ...
 
 // Определяем класс FilmsDB
