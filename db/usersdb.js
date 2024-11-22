@@ -7,7 +7,7 @@ class UsersDB {
   constructor() {
     const schemas = new Schemas();
     const userSchema = schemas.createUserSchema();
-    this.User = mongoose.model('User ', userSchema);
+    this.User = mongoose.model('User', userSchema);
   }
 
  
