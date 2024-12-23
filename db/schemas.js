@@ -63,12 +63,51 @@ class Schemas {
       transform: (doc, ret) => {
         delete ret._id;
         delete ret.__v;
+        delete ret.password;
+        delete ret.email;
         return ret;
       }
     });
 
     return userSchema;
   }
+
+  createFilmHistrySchema(){
+    const filmHistorySchema = new mongoose.Schema({
+    user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    film_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Film' }
+    
+  });
+  
+  filmHistorySchema.set('toJSON', {
+    transform: (doc, ret) => {
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    }
+  });
+  return filmHistorySchema;
+  }
+  
+  
+
+  createFilmBookmarksSchema(){
+    const filmBookmarksSchema = new mongoose.Schema({
+      user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      film_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Film' }
+  });
+  
+  filmBookmarksSchema.set('toJSON', {
+    transform: (doc, ret) => {
+      delete ret._id;
+      delete ret.__v;
+      return ret;
+    }
+  });
+  return filmBookmarksSchema;
+  }
+  
+  
 
   //Режиссер
   createDirectorSchema() {

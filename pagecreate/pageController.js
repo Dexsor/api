@@ -110,7 +110,7 @@ class CGDController {
                         };
 
                         try {
-                            const response = await fetch('/api/v1/${apiCGD}/add', {
+                            const response = await fetch('/api/v1/ms/${apiCGD}/add', {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -159,7 +159,7 @@ class CGDController {
 
                          
                               try {
-                                  const response = await fetch(\`/api/v1/${apiCGD}/delete/\${CGDId}\`, {
+                                  const response = await fetch(\`/api/v1/ms/${apiCGD}/delete/\${CGDId}\`, {
                                       method: 'DELETE',
                                   });
 
@@ -203,7 +203,7 @@ class CGDController {
 
                               // Отправляем обновленное название на сервер
                               try {
-                                  const response = await fetch(\`/api/v1/${apiCGD}/update/\${CGDId}\`, {
+                                  const response = await fetch(\`/api/v1/ms/${apiCGD}/update/\${CGDId}\`, {
                                       method: 'PUT',
                                       headers: {
                                           'Content-Type': 'application/json',
@@ -422,9 +422,9 @@ getAddFilmPage(req, res) {
   }
 
           document.addEventListener('DOMContentLoaded', () => {
-            loadOptions('/api/v1/directors', 'director');
-            loadOptions('/api/v1/countries', 'country');
-            loadOptions('/api/v1/genres', 'genre');
+            loadOptions('/api/v1/ms/directors', 'director');
+            loadOptions('/api/v1/ms/countries', 'country');
+            loadOptions('/api/v1/ms/genres', 'genre');
           });
 
 
@@ -475,7 +475,7 @@ getAddFilmPage(req, res) {
               url_playlist: document.getElementById('url_playlist').value,
             };
 
-            fetch('/api/v1/films/add', {
+            fetch('/api/v1/ms/films/add', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

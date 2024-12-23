@@ -3,6 +3,7 @@
 //импорт модулей
 const http = require('http');
 const url = require('url');
+const fs = require('fs');
 
 const FilmsDB = require('./db/filmsdb');//работа с базой фильмов
 const filmsDB = new FilmsDB();
@@ -11,17 +12,15 @@ const filmsDB = new FilmsDB();
 //const filmController = new addFilmsPagecontroller();
 
 const authPageController = require('./pagecreate/authPageController');//страницы авторизации
-
 const  PageController  = require('./pagecreate/pageController');
-
 const pageController = new PageController();
-
 
 
 const UsersDB = require('./db/usersdb');//работа с базой пользователей
 const usersDB = new UsersDB();
 
 const bcrypt = require('bcrypt');//шифрование
+const UWebToken = require('./utilities/uwebtoken');
 
 //подгрузка ENV
 const { loadEnv } = require('./utilities/uenv');
@@ -29,7 +28,9 @@ loadEnv();
 const PORT = process.env.PORT || 3000;
 const DOMAIN = process.env.DOMAIN || "localhost";
 const PROTOCOL = process.env.PROTOCOL || "http";
-
+const TOKEN_SECRET = process.env.TOKEN_SECRET || "tokensecret123!";
+const CONTENT_VIDEO_URL = process.env.CONTENT_VIDEO_URL ||"/content/video/";
+const CONTENT_VIDEO_SOURCE = process.env.CONTENT_VIDEO_SOURCE ||"/source/content/video/";
 
 //протокол и домен 
 const domain = DOMAIN +':'+ PORT; //const domain = 'video.dexsor.ru';
@@ -47,10 +48,13 @@ function parseRequest(request) {
 
 //функция отправки ответов
 function sendResponse(response, options) {
+  //CORS -вынос мозга
   // Устанавливаем заголовки по умолчанию
   options.headers = options.headers || {};
-  options.headers['Access-Control-Allow-Origin'] = '*';
-  options.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept';
+  options.headers['Access-Control-Allow-Credentials'] = 'true'; // Разрешаем отправку куки
+  options.headers['Access-Control-Allow-Origin'] = 'http://127.0.0.1:59834'; //CORS разрешаем этому домену обращение к нам
+  options.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization';
+  options.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'; // Разрешаем методы
 
   // Устанавливаем код состояния по умолчанию, если он не указан
   const statusCode = options.statusCode || 200; // Установите 200 как значение по умолчанию
@@ -87,6 +91,44 @@ const successResponse = (body) => ({
   body: JSON.stringify(body)
 });
 
+
+
+
+// Проверка токена
+const authenticate = async (req, res, next) => {
+  // Получаем токен из куки
+  const cookies = req.headers.cookie;
+  let token = null;
+
+  // Логируем все куки
+  console.log('Куки:', cookies);
+
+  if (cookies) {
+    const cookieArray = cookies.split('; ');
+    const tokenCookie = cookieArray.find(cookie => cookie.startsWith('token='));
+    if (tokenCookie) {
+      token = tokenCookie.split('=')[1]; // Извлекаем токен
+    }
+  }
+
+  if (!token) {
+    console.log('Нет токена, доступ запрещен');
+    sendResponse(res, response(401, 'Нет токена, доступ запрещен'));
+    return;
+  }
+
+  try {
+    // Создаем экземпляр UWebToken с секретом
+    const tokenService = new UWebToken(TOKEN_SECRET); // 
+    const decoded = tokenService.verify(token); // Используем метод verify из UWebToken
+
+    req.user = decoded; // Сохраняем информацию о пользователе в req
+    next(); // Переходим к следующему обработчику
+  } catch (err) {
+    console.error('Ошибка проверки токена:', err.message);
+    sendResponse(res, response(403, err.message)); // Используем sendResponse для отправки ошибки
+  }
+};
 
 
 //информация об API
@@ -127,17 +169,9 @@ async function getFilms(request, response, query) {
  
 
   let { films, count } = await filmsDB.getFilms(skip, limit, name, genreName, director, country, category, type);
- 
-  
      console.log("кол-во карточек = " + count);
-  
-
-  if (films) {
+    if (films) {
     // Извлекаем текущие параметры запроса
-
-    
-    
-
     // Устанавливаем параметры для следующей страницы
     const nextPage = page < Math.ceil(count / limit) ? `${baseUrl}/api/v1/films?${queryParams.toString().replace(query.page,'').replace('page=','')}&page=${page + 1}` : null;
     
@@ -176,7 +210,9 @@ async function getFilm(request, response, id) {
       console.log(`Фильм с ID ${id} не найден`);
       sendResponse(response, error404);
     } else {
-      console.log(`Фильм с ID ${id} найден`);
+      console.log(`Фильм с ID ${id} найден` +film._id);
+      delete film._id,
+      film.url_playlist = baseUrl + CONTENT_VIDEO_URL + film.id,  
       sendResponse(response, successResponse(film));
     }
   } catch (error) {
@@ -255,14 +291,7 @@ async function addCGD(request, response, type) {
     try {
       const country = JSON.parse(body);
       const newCountry = await filmsDB.addCGD(country, type);
-
-
-
-
-      
-
-
-      // Проверяем, существует ли страна
+     // Проверяем, существует ли страна
 
       if (newCountry.message === "false") {
           console.log("Страна уже существует в базе данных.");
@@ -286,11 +315,8 @@ async function addCGD(request, response, type) {
 async function getCGDs(request, response, type) {
   try {
     let CGDs;
-
         CGDs = await filmsDB.getCGDs( 0,0 ,type);
-  
-
-      
+     
       // Форматируем ответ
       const formattedCGD = CGDs.map(CGD => ({
           id: CGD._id, // Добавляем идентификатор
@@ -399,7 +425,7 @@ async function registerUser     (request, response) {
 }
 
 //функция авторизации пользователя
-async function loginUser(request, response) {
+/*async function loginUser(request, response) {
   let body = '';
   request.on('data', (chunk) => {
     body += chunk;
@@ -431,15 +457,67 @@ async function loginUser(request, response) {
       sendResponse(response, error404);
     }
   });
+}*/
+async function loginUser (request, response) {
+  console.log('Попытка авторизации...');
+  let body = '';
+
+  // Обработка данных запроса
+  request.on('data', (chunk) => {
+    body += chunk;
+  });
+
+  request.on('end', async () => {
+    if (body.trim() === '') {
+      sendResponse(response, error404);
+      return;
+    }
+
+    try {
+      const { username, password } = JSON.parse(body);
+
+      // Проверка на наличие username и password
+      if (!username || !password) {
+        sendResponse(response, error401);
+        console.log('Логин и пароль обязательны');
+        return;
+      }
+
+      const result = await usersDB.loginUser (username, password);
+
+      // Проверка результата авторизации
+      if (!result) {
+        sendResponse(response, error401);
+        console.log('Неверный логин или пароль');
+        return;
+      }
+
+      const { user, token } = result; 
+      console.log('Вы успешно авторизованы, токен: ' + token);
+      sendResponse(response, {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Вы успешно авторизованы', token }) // Возвращаем токен
+      });
+    } catch (err) {
+      console.error('Ошибка при авторизации:', err);
+      sendResponse(response, error404);
+    }
+  });
 }
-
-
-
-
-
 
   //создание сервера
   const server = http.createServer( async(request, response) => {
+    if (request.method === 'OPTIONS') { //CORS is pain =(
+      response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:59834');
+      response.setHeader('Access-Control-Allow-Credentials', 'true');
+      response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+      response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      response.writeHead(204); 
+      response.end();
+      return;
+
+  }
     const { pathname, query } = parseRequest(request);
     let path = pathname;
     if (path.endsWith('/')) {
@@ -450,28 +528,102 @@ async function loginUser(request, response) {
     '/api/v1': getApiInfo,
     '/api/v1/auth/reg': registerUser ,
     '/api/v1/auth/login': loginUser,
+    '/api/v1/auth/logout': (request, response) => {
+      // Удаляем куки
+      response.setHeader('Set-Cookie', 'token=; Max-Age=0; path=/; HttpOnly;');
+      sendResponse(response, successResponse({ message: 'Вы успешно вышли из системы' }));
+    },
+   
     '/api/v1/films': (request, response) => getFilms(request, response, query),
-    '/api/v1/films/:id': getFilm,
-    '/api/v1/films/add': addFilm,
-    '/api/v1/films/add-page': (request, response) => {
+    
+    '/api/v1/ms/films/add': await addFilm ,
+    '/api/v1/ms/films/add-page': async (request, response) => {
+      await authenticate(request, response, async () => {
       const result = pageController.getAddFilmPage(request, response);
       sendResponse(response, result);
+      });
 
     },
+   
+  /*  '/content/video/2': async (request, response) => {
+    await authenticate(request, response, async () => {
+        console.log("Запрос на скачивание видеофайла");
 
-'/api/v1/countries/edit-page': async (request, response) => {
+        const requestPath = request.url; // Получаем URL запроса
+        const filmId = requestPath.split('/').pop(); // Получаем ID фильма из URL
+
+        console.log(`Получен ID фильма: ${filmId}`);
+
+        const filmRecord = await filmsDB.getFilm(filmId); // Получаем запись фильма из базы данных
+
+        if (!filmRecord) {
+            console.log("Фильм не найден в базе данных");
+            response.writeHead(404, { 'Content-Type': 'application/json' });
+            return response.end(JSON.stringify({ message: 'Film not found in database' }));
+        }
+
+        const filePath = __dirname + CONTENT_VIDEO_SOURCE + filmRecord.url_playlist; // Путь к файлу на сервере
+
+        console.log(`Путь к файлу: ${filePath}`);
+
+        // Проверяем, существует ли файл
+        if (!fs.existsSync(filePath)) {
+            console.log("Файл не найден на сервере");
+            response.writeHead(404, { 'Content-Type': 'application/json' });
+            return response.end(JSON.stringify({ message: 'File not found on server' }));
+        }
+
+        // Устанавливаем заголовки для отправки файла
+        response.writeHead(200, {
+            'Content-Type': 'video/mp4', // Укажите правильный тип контента
+            'Content-Disposition': `attachment; filename="${filmRecord.url_playlist}"`
+        });
+
+        console.log("Отправка файла");
+
+        // Отправляем файл
+        const readStream = fs.createReadStream(filePath);
+        readStream.pipe(response);
+        readStream.on('error', (err) => {
+            console.error("Ошибка при отправке файла:", err);
+            response.writeHead(500);
+            response.end('Internal Server Error');
+        });
+
+        // Добавляем запись в историю
+        try {
+          
+            const userData = await usersDB.getUserBy_Id(request.user.id); // Предполагаем, что данные пользователя доступны после аутентификации
+            await filmsDB.addHistory(filmRecord, userData); // Добавляем фильм в историю
+            console.log('Фильм добавлен в историю');
+        } catch (error) {
+            console.error('Ошибка при добавлении фильма в историю:', error.message);
+        }
+    });
+},
+  
+    */
+
+'/api/v1/ms/countries/edit-page': async (request, response) => {
+  // Используем authenticate как асинхронную функцию (ggw)
+  await authenticate(request, response, async () => {
     const result = await pageController.getCGDPage(request, response, filmsDB, "country");
     sendResponse(response, result);
+  });
 },
 
-'/api/v1/genres/edit-page': async (request, response) => {
+'/api/v1/ms/genres/edit-page': async (request, response) => {
+  await authenticate(request, response, async () => {
     const result = await pageController.getCGDPage(request, response, filmsDB, "genre");
     sendResponse(response, result);
+  });
 },
 
-'/api/v1/directors/edit-page': async (request, response) => {
+'/api/v1/ms/directors/edit-page': async (request, response) => {
+  await authenticate(request, response, async () => {
     const result = await pageController.getCGDPage(request, response, filmsDB, "director");
     sendResponse(response, result);
+  });
 },
 /*
 '/api/v1/film/edit-page/:id': async (request, response) => {
@@ -491,104 +643,210 @@ async function loginUser(request, response) {
     },
     
     // Жанры
-    '/api/v1/genres': (request, response) => getCGDs(request, response, "genre"),// Получение списка стран getCGD("country")
-    '/api/v1/genres/add': (request, response) => addCGD(request, response, "genre"), // Добавление страны
-   // '/api/v1/genres/update/:id': updateCGD, // Добавление страны updateCGD, // Обновление страны '/api/v1/countries/:id': updateCountry,
-   // '/api/v1/genres/delete/:id': deleteCGD, // Удаление страны
+    '/api/v1/ms/genres': (request, response) => getCGDs(request, response, "genre"),// Получение списка стран getCGD("country")
+    '/api/v1/ms/genres/add':async (request, response) => {
+      await authenticate(request, response, async () => {
+      await addCGD(request, response, "genre"); // Добавление страны
+      });
+    },
+   
     // Страны
-    '/api/v1/countries': (request, response) => getCGDs(request, response, "country"),// Получение списка стран getCGD("country")
-    '/api/v1/countries/add': (request, response) => addCGD(request, response, "country"), // Добавление страны
-    '/api/v1/countries/update/:id': updateCGD, // Добавление страны updateCGD, // Обновление страны '/api/v1/countries/:id': updateCountry,
-    '/api/v1/countries/delete/:id': deleteCGD, // Удаление страны
-    
+    '/api/v1/ms/countries': (request, response) => getCGDs(request, response, "country"),// Получение списка стран getCGD("country")
+    '/api/v1/ms/countries/add': async (request, response) => {
+      await authenticate(request, response, async () => {
+      await addCGD(request, response, "country"); // Добавление страны
+      });
+    },
+   
     // Режиссеры
-    '/api/v1/directors': (request, response) => getCGDs(request, response, "director"),// Получение списка стран getCGD("country")
-    '/api/v1/directors/add': (request, response) => addCGD(request, response, "director"), // Добавление страны
-    '/api/v1/directors/update/:id': updateCGD, // Добавление страны updateCGD, // Обновление страны '/api/v1/countries/:id': updateCountry,
-    '/api/v1/directors/delete/:id': deleteCGD, // Удаление страны
-
-  
-
-
+    '/api/v1/ms/directors': (request, response) => getCGDs(request, response, "director"),// Получение списка стран getCGD("country")
+    '/api/v1/ms/directors/add': async(request, response) => {
+      await authenticate(request, response, async () => {
+      await addCGD(request, response, "director"); // Добавление страны
+      });
+    },
+    
+    // Защищенный маршрут
+    '/api/v1/protected': (request, response) => { 
+      authenticate(request, response, async() => {
+     // Если аутентификация прошла успешно, отправляем ответ
+     const userinfo =  await usersDB.getUserBy_Id(request.user.id);
+     sendResponse(response, successResponse({ message: 'Добро пожаловать в защищенный маршрут!', user:  userinfo, info: request.user,  nowTime: Math.floor(Date.now() / 1000) }));
+     });
+    },
   };
 
 
-  // Обработка запросов по маршрутам
-  // Обработка запросов по маршрутам
+   // Обработка запросов по маршрутам
 if (path in routes) {
   routes[path](request, response);
 } else if (path.startsWith('/api/v1/films/')) {
   const filmId = path.replace('/api/v1/films/', ''); // получаем ID фильма
 
   if (request.method === 'GET') {
+  
+   await  getFilm(request, response, filmId);
+   
     // Если метод GET, возвращаем фильм
-    getFilm(request, response, filmId);
+    //getFilm(request, response, filmId);
   } else if (request.method === 'PATCH') {
+    await authenticate(request, response, async() => {
     // Если метод PATCH, обновляем фильм
-    updateFilm(request, response, filmId);
+    await updateFilm(request, response, filmId) });
   } else if (request.method === 'DELETE') {
+    await authenticate(request, response, async() => {
     // Если метод DELETE, удаляем фильм
-    deleteFilm(request, response, filmId);
+    await deleteFilm(request, response, filmId) });
   } else {
     // Если метод не поддерживается, возвращаем ошибку
     sendResponse(response, { status: 405, message: 'Метод не поддерживается' });
   }
 
-  }  else if (path.startsWith('/api/v1/countries/delete/')) {
-    const _Id = path.replace('/api/v1/countries/delete/', ''); // получаем ID
+}else if (path.startsWith('/content/video/')) {
+  const _Id = path.replace('/content/video/', ''); // получаем ID
+  if (_Id) {
+    await authenticate(request, response, async () => {
+      console.log("Запрос на скачивание видеофайла");
+      const requestPath = request.url; // Получаем URL запроса
+      const filmId = requestPath.split('/').pop(); // Получаем ID фильма из URL
+      console.log(`Получен ID фильма: ${filmId}`);
+      const filmRecord = await filmsDB.getFilm(filmId); // Получаем запись фильма из базы данных
+      if (!filmRecord) {
+          console.log("Фильм не найден в базе данных");
+          response.writeHead(404, { 'Content-Type': 'application/json' });
+          return response.end(JSON.stringify({ message: 'Film not found in database' }));
+      }
+      const filePath = __dirname + CONTENT_VIDEO_SOURCE + filmRecord.url_playlist; // Путь к файлу на сервере
+      console.log(`Путь к файлу: ${filePath}`);
+      // Проверяем, существует ли файл
+      if (!fs.existsSync(filePath)) {
+          console.log("Файл не найден на сервере");
+          response.writeHead(404, { 'Content-Type': 'application/json' });
+          return response.end(JSON.stringify({ message: 'File not found on server' }));
+      }
+
+      // Устанавливаем заголовки для отправки файла
+      response.writeHead(200, {
+          'Content-Type': 'video/mp4', // Укажите правильный тип контента
+          'Content-Disposition': `attachment; filename="${filmRecord.url_playlist}"`
+      });
+
+      console.log("Отправка файла");
+
+      // Отправляем файл
+      const readStream = fs.createReadStream(filePath);
+      readStream.pipe(response);
+      readStream.on('error', (err) => {
+          console.error("Ошибка при отправке файла:", err);
+          response.writeHead(500);
+          response.end('Internal Server Error');
+      });
+
+      // Добавляем запись в историю
+      try {
+        
+          const userData = await usersDB.getUserBy_Id(request.user.id); // Предполагаем, что данные пользователя доступны после аутентификации
+          await filmsDB.addHistory(filmRecord, userData); // Добавляем фильм в историю
+          console.log('Фильм добавлен в историю');
+      } catch (error) {
+          console.error('Ошибка при добавлении фильма в историю:', error.message);
+      }
+  });
+  } else {
+    sendResponse(response, error404); // если ID  не указан, это ошибка
+  }
+
+
+  //add bookmark
+}else if (path.startsWith('/api/v1/user/bookmark/add/')) {
+  const _Id = path.replace('/api/v1/user/bookmark/add/', ''); // получаем ID
+  if (_Id) {
+    await authenticate(request, response, async () => {
+      console.log("Запрос на добавление фильма в закладки");
+      const requestPath = request.url; // Получаем URL запроса
+      const filmId = requestPath.split('/').pop(); // Получаем ID фильма из URL
+      console.log(`Получен ID фильма: ${filmId}`);
+      const filmRecord = await filmsDB.getFilm(filmId); // Получаем запись фильма из базы данных
+      if (!filmRecord) {
+          console.log("Фильм не найден в базе данных");
+          response.writeHead(404, { 'Content-Type': 'application/json' });
+          return response.end(JSON.stringify({ message: 'Film not found in database' }));
+      }
+
+      // Добавляем запись в историю
+      try {
+          const userData = await usersDB.getUserBy_Id(request.user.id); // Предполагаем, что данные пользователя доступны после аутентификации
+          await filmsDB.addBookmark(filmRecord, userData); // Добавляем фильм в закладки
+          console.log('Фильм добавлен в закладки');
+      } catch (error) {
+          console.error('Ошибка при добавлении фильма в закладки:', error.message);
+      }
+  });
+  } else {
+    sendResponse(response, error404); // если ID  не указан, это ошибка
+  }
+
+  }  else if (path.startsWith('/api/v1/ms/countries/delete/')) {
+    const _Id = path.replace('/api/v1/ms/countries/delete/', ''); // получаем ID
     if (_Id) {
-      deleteCGD(request, response, _Id, "country"); // если ID указан, возвращаем 
+      await authenticate(request, response, async() => {
+      await deleteCGD(request, response, _Id, "country") }); // если ID указан, возвращаем 
     } else {
       sendResponse(response, error404); // если ID  не указан, это ошибка
     }
-  }else if (path.startsWith('/api/v1/countries/update/')) {
-    const _Id = path.replace('/api/v1/countries/update/', ''); // получаем ID
+  }else if (path.startsWith('/api/v1/ms/countries/update/')) {
+    const _Id = path.replace('/api/v1/ms/countries/update/', ''); // получаем ID
     if (_Id) {
-      updateCGD(request, response, _Id, "country"); // если ID указан, возвращаем 
+      await authenticate(request, response, async() => {
+      await updateCGD(request, response, _Id, "country") }); // если ID указан, возвращаем 
     } else {
       sendResponse(response, error404); // если ID  не указан, это ошибка
     }
-  }else if (path.startsWith('/api/v1/genres/delete/')) {
-    const _Id = path.replace('/api/v1/genres/delete/', ''); // получаем ID
+  }else if (path.startsWith('/api/v1/ms/genres/delete/')) {
+    const _Id = path.replace('/api/v1/ms/genres/delete/', ''); // получаем ID
     if (_Id) {
-      deleteCGD(request, response, _Id, "genre"); // если ID указан, возвращаем 
+      await authenticate(request, response, async() => {
+      await deleteCGD(request, response, _Id, "genre") }); // если ID указан, возвращаем 
     } else {
       sendResponse(response, error404); // если ID  не указан, это ошибка
     }
-  }else if (path.startsWith('/api/v1/genres/update/')) {
-    const _Id = path.replace('/api/v1/genres/update/', ''); // получаем ID
+  }else if (path.startsWith('/api/v1/ms/genres/update/')) {
+    const _Id = path.replace('/api/v1/ms/genres/update/', ''); // получаем ID
     if (_Id) {
-      updateCGD(request, response, _Id, "genre"); // если ID указан, возвращаем 
+      await authenticate(request, response, async() => {
+      await updateCGD(request, response, _Id, "genre") }); // если ID указан, возвращаем 
     } else {
       sendResponse(response, error404); // если ID  не указан, это ошибка
     }
-  }else if (path.startsWith('/api/v1/directors/delete/')) {
-    const _Id = path.replace('/api/v1/directors/delete/', ''); // получаем ID
+  }else if (path.startsWith('/api/v1/ms/directors/delete/')) {
+    const _Id = path.replace('/api/v1/ms/directors/delete/', ''); // получаем ID
     if (_Id) {
-      deleteCGD(request, response, _Id, "director"); // если ID указан, возвращаем 
+      await authenticate(request, response, async() => {
+      await deleteCGD(request, response, _Id, "director") }); // если ID указан, возвращаем 
     } else {
       sendResponse(response, error404); // если ID  не указан, это ошибка
     }
-  }else if (path.startsWith('/api/v1/directors/update/')) {
-    const _Id = path.replace('/api/v1/directors/update/', ''); // получаем ID
+  }else if (path.startsWith('/api/v1/ms/directors/update/')) {
+    const _Id = path.replace('/api/v1/ms/directors/update/', ''); // получаем ID
     if (_Id) {
-      updateCGD(request, response, _Id, "director"); // если ID указан, возвращаем 
+      await authenticate(request, response, async() => {
+      await updateCGD(request, response, _Id, "director") }); // если ID указан, возвращаем 
     } else {
       sendResponse(response, error404); // если ID  не указан, это ошибка
     }
-  } else if (path.startsWith('/api/v1/film/edit-page/')) {
-    const _Id = path.replace('/api/v1/film/edit-page/', ''); // получаем ID
+  } else if (path.startsWith('/api/v1/ms/film/edit-page/')) {
+    const _Id = path.replace('/api/v1/ms/film/edit-page/', ''); // получаем ID
     if (_Id) {
+      await authenticate(request, response, async() => {
      const result = await pageController.getEditFilmPage(request, response, filmsDB, _Id); // Используем await
      sendResponse(response, result); // Отправляем результат
+      });
         
     } else {
         sendResponse(response, error404); // если ID не указан, это ошибка
     }
     
   }
-
-  
 
 });
 

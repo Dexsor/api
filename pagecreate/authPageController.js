@@ -170,23 +170,23 @@ class authPageController {
     
           <label for="password">Пароль:</label>
           <input type="password" id="password" name="password" required>
-
-                <button type="submit">Войти</button>
-                <div id="error-message" class="error"></div>
-              </form>
   
+          <button type="submit">Войти</button>
+          <div id="error-message" class="error"></div>
+        </form>
+    
         <script>
           const form = document.getElementById('login-form');
           const errorMessage = document.getElementById('error-message');
-  
+    
           form.addEventListener('submit', (e) => {
             e.preventDefault();
-  
+    
             const data = {
               username: document.getElementById('username').value,
               password: document.getElementById('password').value,
             };
-  
+    
             fetch('/api/v1/auth/login', {
               method: 'POST',
               headers: {
@@ -198,20 +198,23 @@ class authPageController {
             .then((data) => {
               if (data.message === 'Неправильный логин или пароль') {
                 errorMessage.textContent = 'Неправильный логин или пароль';
-              } else if (data.message === 'Вы успешно авторизованы') {
+              } else if (data.token) {
+                // Сохраняем токен в куки
+                document.cookie = "token=" + data.token + "; path=/"; // Устанавливаем куки
                 errorMessage.textContent = 'Вы успешно авторизованы';
+                // Перенаправление на защищенный маршрут или главную страницу
+                window.location.href = '/api/v1/protected';
               }
             })
             .catch((error) => {
               errorMessage.textContent = 'Ошибка авторизации';
             });
           });
-       
-          </script>
-        </body>
+        </script>
+      </body>
       </html>
     `;
-  
+    
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'text/html' },

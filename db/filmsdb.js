@@ -12,6 +12,8 @@ class FilmsDB {
     const filmGenreSchema = schemas.createFilmGenreSchema();
     const filmCountrySchema = schemas.createFilmCountrySchema();
     const filmDirectorSchema = schemas.createFilmDirectorSchema();
+    const filmHistorySchema = schemas.createFilmHistrySchema();
+    const filmBookmarksSchema = schemas.createFilmBookmarksSchema();
 
     this.Film = mongoose.model('Film', filmSchema);
     this.Director = mongoose.model('Director', directorSchema);
@@ -20,6 +22,8 @@ class FilmsDB {
     this.FilmGenre = mongoose.model('FilmGenre', filmGenreSchema);
     this.FilmCountry = mongoose.model('FilmCountry', filmCountrySchema);
     this.FilmDirector = mongoose.model('FilmDirector', filmDirectorSchema);
+    this.FilmHistory = mongoose.model('FilmHistory', filmHistorySchema);
+    this.FilmBookmarks= mongoose.model('FilmBookmarks', filmBookmarksSchema);
 
   
   }
@@ -152,7 +156,7 @@ if (nonEmptyFilmIds.length > 0) {
           age: film.age,
           video_quality: film.video_quality,
           url_poster: film.url_poster,
-          url_playlist: film.url_playlist,
+          url_playlist: 'http://127.0.0.1:3000/api/v1/content/video/' + film.url_playlist,
           rating: film.rating,
           views: film.views,
         };
@@ -211,6 +215,7 @@ async getFilm(id) {
 
     
     const transformedFilm = {
+      _id: film._id,
       id: film.id,
       type: film.type,
       name: film.name,
@@ -465,7 +470,7 @@ async getFilm(id) {
   }
 
 
-  // Методы для жанров
+  // Методы для жанров, стран, режиссеров
 
   async addCGD(CGD, type) {
     try {
@@ -603,6 +608,53 @@ async getFilm(id) {
         }
       
        
-      }
       
+
+
+
+        async addHistory(filmData, userData) {
+          try {
+              console.log("add history ="+filmData + "user= " + userData._id + "film data ="+filmData._id); // Логируем данные фильма
+      
+              // Создаем новый объект истории фильма
+              const newFilmHistory = new this.FilmHistory({
+                  _id: new mongoose.Types.ObjectId(), // Генерируем новый ObjectId
+                  user_id: userData._id, // Используем userData для получения уникального идентификатора пользователя
+                  film_id: filmData._id, // Уникальный идентификатор фильма
+              });
+      
+              // Сохраняем фильм в базе данных
+              await newFilmHistory.save();
+      
+              // Возвращаем сообщение и созданный объект истории фильма
+              return { message: 'Фильм успешно добавлен в историю', filmHistory: newFilmHistory };
+          } catch (err) {
+              console.error(err);
+              throw new Error('Ошибка при добавлении фильма в историю: ' + err.message);
+          }
+      }
+
+      async addBookmark(filmData, userData) {
+        try {
+            console.log("add bookmark ="+filmData + "user= " + userData._id + "film data ="+filmData._id); // Логируем данные фильма
+    
+            // Создаем новый объект истории фильма
+            const newFilmBookmark = new this.FilmBookmark({
+                _id: new mongoose.Types.ObjectId(), // Генерируем новый ObjectId
+                user_id: userData._id, // Используем userData для получения уникального идентификатора пользователя
+                film_id: filmData._id, // Уникальный идентификатор фильма
+            });
+    
+            // Сохраняем фильм в базе данных
+            await newFilmBookmark.save();
+    
+            // Возвращаем сообщение и созданный объект истории фильма
+            return { message: 'Фильм успешно добавлен в историю', filmBookmark: newFilmBookmark };
+        } catch (err) {
+            console.error(err);
+            throw new Error('Ошибка при добавлении фильма в историю: ' + err.message);
+        }
+    }
+      
+    }
       module.exports = FilmsDB;
