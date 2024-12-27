@@ -31,6 +31,7 @@ const PROTOCOL = process.env.PROTOCOL || "http";
 const TOKEN_SECRET = process.env.TOKEN_SECRET || "tokensecret123!";
 const CONTENT_VIDEO_URL = process.env.CONTENT_VIDEO_URL ||"/content/video/";
 const CONTENT_VIDEO_SOURCE = process.env.CONTENT_VIDEO_SOURCE ||"/source/content/video/";
+const TOKEN_TIME = process.env.TOKEN_TIME|| 3600;
 
 //протокол и домен 
 const domain = DOMAIN +':'+ PORT; //const domain = 'video.dexsor.ru';
@@ -52,7 +53,7 @@ function sendResponse(response, options) {
   // Устанавливаем заголовки по умолчанию
   options.headers = options.headers || {};
   options.headers['Access-Control-Allow-Credentials'] = 'true'; // Разрешаем отправку куки
-  options.headers['Access-Control-Allow-Origin'] = 'http://127.0.0.1:59834'; //CORS разрешаем этому домену обращение к нам
+  options.headers['Access-Control-Allow-Origin'] = 'http://127.0.0.1:51218'; //CORS разрешаем этому домену обращение к нам
   options.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization';
   options.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'; // Разрешаем методы
 
@@ -148,7 +149,7 @@ async function getFilms(request, response, query) {
   console.log("апи ссылка2 = " + queryParams.toString().replace(query.page,'').replace('page=',''));
  
   const page = parseInt(queryParams.get('page')) || 1; // Получаем номер страницы
-  const limit = 5;
+  const limit = 6;
   const skip = (page - 1) * limit;
   
 
@@ -221,6 +222,76 @@ async function getFilm(request, response, id) {
   }
 }
 
+
+async function searchFilms(request, response, query) {
+  const queryParams = new URLSearchParams(query);
+  console.log("апи ссылка = " + queryParams.toString());
+
+  const page = parseInt(queryParams.get('page')) || 1; // Получаем номер страницы
+  const limit = 5; // Количество фильмов на странице
+  const skip = (page - 1) * limit; // Пропуск фильмов для пагинации
+
+  // Параметры для поиска
+  const name = queryParams.get('name') || null; // Название фильма для поиска
+  const genreName = queryParams.get('genre') || null; // Имя жанра для фильтрации
+  const director = queryParams.get('director') || null; // Имя режиссера для фильтрации
+  const country = queryParams.get('country') || null; // Страна для фильтрации
+
+  if (name===null ) {
+    return sendResponse(response, error404);
+    }
+
+  try {
+      // Выполняем поиск фильмов по названию
+      let films = await filmsDB.searchFilmsByName(name); // Используем метод поиска
+
+      // Если фильмов не найдено, возвращаем 404
+      if (!films || films.length === 0 ) {
+          return sendResponse(response, error404);
+      }
+
+      // Применяем дополнительные фильтры, если они указаны
+      if (genreName) {
+          films = films.filter(film => film.genre.includes(genreName));
+      }
+      if (director) {
+          films = films.filter(film => film.director.includes(director));
+      }
+      if (country) {
+          films = films.filter(film => film.country.includes(country));
+      }
+
+      // Получаем общее количество фильмов после фильтрации
+      const count = films.length;
+
+      // Применяем пагинацию
+      const paginatedFilms = films.slice(skip, skip + limit);
+
+      // Устанавливаем параметры для следующей страницы
+      const nextPage = page < Math.ceil(count / limit) ? `${baseUrl}/api/v1/films/search?${queryParams.toString().replace('page=' + page, 'page=' + (page + 1))}` : null;
+
+      const data = {
+        films,
+        page: {
+          current: page,
+          next: nextPage
+        },
+        films: films.map((film) => ({
+          id: film.id,
+          type: film.type,
+          name: film.name,
+          released: film.released,
+          url_poster: film.url_poster,
+          url_playlist: `${baseUrl}/api/v1/films/${film.id}`
+  
+        }))
+      };
+      sendResponse(response, successResponse(data));
+  } catch (err) {
+      console.error('Ошибка при поиске фильмов:', err);
+      sendResponse(response, { status: 500, message: 'Ошибка при поиске фильмов' });
+  }
+}
 
 //функция добавления фильма
 async function addFilm(request, response) {
@@ -464,52 +535,57 @@ async function loginUser (request, response) {
 
   // Обработка данных запроса
   request.on('data', (chunk) => {
-    body += chunk;
+      body += chunk;
   });
 
   request.on('end', async () => {
-    if (body.trim() === '') {
-      sendResponse(response, error404);
-      return;
-    }
-
-    try {
-      const { username, password } = JSON.parse(body);
-
-      // Проверка на наличие username и password
-      if (!username || !password) {
-        sendResponse(response, error401);
-        console.log('Логин и пароль обязательны');
-        return;
+      if (body.trim() === '') {
+          sendResponse(response, error404);
+          return;
       }
 
-      const result = await usersDB.loginUser (username, password);
+      try {
+          const { username, password } = JSON.parse(body);
 
-      // Проверка результата авторизации
-      if (!result) {
-        sendResponse(response, error401);
-        console.log('Неверный логин или пароль');
-        return;
+          // Проверка на наличие username и password
+          if (!username || !password) {
+              sendResponse(response, error401);
+              console.log('Логин и пароль обязательны');
+              return;
+          }
+
+          const result = await usersDB.loginUser (username, password);
+
+          // Проверка результата авторизации
+          if (!result) {
+              sendResponse(response, error401);
+              console.log('Неверный логин или пароль');
+              return;
+          }
+
+          const { user, token } = result; 
+          console.log('Вы успешно авторизованы, токен: ' + token);
+
+          // Установка куки с токеном без атрибута Secure
+          response.setHeader('Set-Cookie', `token=${token}; Max-Age=${TOKEN_TIME}; path=/; SameSite=Lax;`);
+
+          // Отправка ответа
+          sendResponse(response, {
+              statusCode: 200,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: 'Вы успешно авторизованы', token }) // Возвращаем токен
+          });
+      } catch (err) {
+          console.error('Ошибка при авторизации:', err);
+          sendResponse(response, error404);
       }
-
-      const { user, token } = result; 
-      console.log('Вы успешно авторизованы, токен: ' + token);
-      sendResponse(response, {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: 'Вы успешно авторизованы', token }) // Возвращаем токен
-      });
-    } catch (err) {
-      console.error('Ошибка при авторизации:', err);
-      sendResponse(response, error404);
-    }
   });
 }
 
   //создание сервера
   const server = http.createServer( async(request, response) => {
     if (request.method === 'OPTIONS') { //CORS is pain =(
-      response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:59834');
+      response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:51218');
       response.setHeader('Access-Control-Allow-Credentials', 'true');
       response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
       response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -530,7 +606,7 @@ async function loginUser (request, response) {
     '/api/v1/auth/login': loginUser,
     '/api/v1/auth/logout': (request, response) => {
       // Удаляем куки
-      response.setHeader('Set-Cookie', 'token=; Max-Age=0; path=/; HttpOnly;');
+      response.setHeader('Set-Cookie', 'token=; Max-Age=0; path=/;  SameSite=Lax;');
       sendResponse(response, successResponse({ message: 'Вы успешно вышли из системы' }));
     },
    
@@ -539,7 +615,7 @@ async function loginUser (request, response) {
     '/api/v1/ms/films/add': await addFilm ,
     '/api/v1/ms/films/add-page': async (request, response) => {
       await authenticate(request, response, async () => {
-      const result = pageController.getAddFilmPage(request, response);
+      const result = await pageController.getAddFilmPage(request, response);
       sendResponse(response, result);
       });
 
@@ -639,6 +715,15 @@ async function loginUser (request, response) {
     },
     '/api/v1/auth/loginp': async (request, response) => {
       const result = await authPageController.getLoginPage(request, response);
+      sendResponse(response, result);
+    },
+
+    '/api/v1/auth/lk': async (request, response) => {
+      const result = await authPageController.getDashboardPage(request, response);
+      sendResponse(response, result);
+    },
+    '/api/v1/ms/films/list': async (request, response) => {
+      const result = await pageController.getFilmsPage(request, response);
       sendResponse(response, result);
     },
     
@@ -846,9 +931,20 @@ if (path in routes) {
         sendResponse(response, error404); // если ID не указан, это ошибка
     }
     
+  } else if (path.startsWith('/api/v1/user/search')) {
+    if (request.method === 'GET') {
+       // await authenticate(request, response, async () => {
+            // Выполняем поиск фильмов
+            await searchFilms(request, response, query); // Убедитесь, что передаете request.query
+     //   });
+    } else {
+        sendResponse(response, error404); // Если метод не поддерживается, возвращаем ошибку
+    }
+}
+    
   }
 
-});
+);
 
 //запуск сервера
 server.listen(3000, () => {

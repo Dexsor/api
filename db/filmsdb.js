@@ -23,14 +23,12 @@ class FilmsDB {
     this.FilmCountry = mongoose.model('FilmCountry', filmCountrySchema);
     this.FilmDirector = mongoose.model('FilmDirector', filmDirectorSchema);
     this.FilmHistory = mongoose.model('FilmHistory', filmHistorySchema);
-    this.FilmBookmarks= mongoose.model('FilmBookmarks', filmBookmarksSchema);
+    this.FilmBookmark= mongoose.model('FilmBookmarks', filmBookmarksSchema);
 
   
   }
 
   // Метод класса возвращает список фильмов
-
-
   async getFilms(skip, limit, name = null, genreName = null, directorName = null, countryName = null, category , typeName) {
     try {
       // Создаем объект запроса
@@ -156,7 +154,7 @@ if (nonEmptyFilmIds.length > 0) {
           age: film.age,
           video_quality: film.video_quality,
           url_poster: film.url_poster,
-          url_playlist: 'http://127.0.0.1:3000/api/v1/content/video/' + film.url_playlist,
+          url_playlist: film.url_playlist,
           rating: film.rating,
           views: film.views,
         };
@@ -655,6 +653,58 @@ async getFilm(id) {
             throw new Error('Ошибка при добавлении фильма в историю: ' + err.message);
         }
     }
+
+    async searchFilmsByName(name) {
+      try {
+          // Проверяем, что имя передано
+          if (!name) {
+              throw new Error('Название фильма не указано');
+          }
+  
+          // Используем регулярное выражение для поиска по названию
+          const films = await this.Film.find({
+              name: { $regex: name, $options: 'i' } // 'i' для нечувствительности к регистру
+          });
+  
+          // Преобразуем фильмы для удобного вывода
+          const transformedFilms = await Promise.all(films.map(async (film) => {
+              // Получаем жанры через связи
+              const filmGenres = await this.FilmGenre.find({ film_id: film._id }).populate('genre_id');
+              const genres = filmGenres.map(fg => fg.genre_id.name).join(', ');
+  
+              // Получаем страны через связи
+              const filmCountries = await this.FilmCountry.find({ film_id: film._id }).populate('country_id');
+              const countries = filmCountries.map(fc => fc.country_id.name).join(', ');
+  
+              // Получаем режиссеров через связи
+              const filmDirectors = await this.FilmDirector.find({ film_id: film._id }).populate('director_id');
+              const directors = filmDirectors.map(fd => fd.director_id.name).join(', ');
+  
+              return {
+                id: film.id,
+                type: film.type,
+                name: film.name,
+                originalname: film.originalname,
+                released: film.released,
+                description: film.description,
+                director: directors || 'Неизвестный режиссер',
+                country: countries || 'Неизвестная страна',
+                genre: genres || 'Нет жанров',
+                age: film.age,
+                video_quality: film.video_quality,
+                url_poster: film.url_poster,
+                url_playlist: 'http://127.0.0.1:3000/api/v1/content/video/' + film.url_playlist,
+                rating: film.rating,
+                views: film.views,
+              };
+          }));
+  
+          return transformedFilms;
+      } catch (err) {
+          console.error('Ошибка при поиске фильмов:', err);
+          throw new Error('Ошибка при поиске фильмов: ' + err.message);
+      }
+  }
       
     }
       module.exports = FilmsDB;

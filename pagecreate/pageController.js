@@ -65,15 +65,77 @@ class CGDController {
                 <meta charset="UTF-8">
                 <title>Список ${nameCGDs}</title>
                 <style>
-                    body { font-family: Arial, sans-serif; }
+                    body {
+                  font-family: Arial, sans-serif;
+                  margin: 0;
+                  padding: 0;
+                  background-color: #f4f4f4;
+              }
                     table { width: 100%; border-collapse: collapse; }
                     th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
                     th { background-color: #f2f2f2; }
                     button { background-color: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
                     button:hover { background-color: #45a049; }
+
+              .header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 10px 20px;
+                  background-color: #4CAF50;
+                  color: white;
+              }
+              .header h1 {
+                  margin: 0;
+              }
+              .nav {
+                  margin: 20px;
+                  text-align: center;
+              }
+              .nav a {
+                  margin: 0 15px;
+                  text-decoration: none;
+                  color: #4CAF50;
+                  font-weight: bold;
+              }
+              .nav a:hover {
+                  text-decoration: underline;
+              }
+              .logout-button {
+                  background-color: #f44336; /* Красный цвет для кнопки выхода */
+                  color: white;
+                  border: none;
+                  padding: 10px 15px;
+                  border-radius: 5px;
+                  cursor: pointer;
+              }
+              .logout-button:hover {
+                  background-color: #d32f2f; /* Темнее при наведении */
+              }
+
+              .content {
+                  padding: 20px;
+                  text-align: center;
+              }
                 </style>
             </head>
             <body>
+
+               <div class="header">
+              <h1>Личный кабинет</h1>
+              <button class="logout-button" onclick="logout()">Выход</button>
+              </div>
+
+                <div class="nav">
+                <a href="/api/v1/ms/films/add-page">Добавить фильм</a>
+                <a href="/api/v1/ms/films/list">Список фильмов</a>
+                <a href="/api/v1/ms/genres/edit-page">Жанры</a>
+                <a href="/api/v1/ms/countries/edit-page">Страны</a>
+                <a href="/api/v1/ms/directors/edit-page">Режиссеры</a>
+                </div>
+
+                
+                <div class="content">
                 <h1>Список ${nameCGDs}</h1>
                 <table id="CGD-table">
                     <tr>
@@ -97,7 +159,7 @@ class CGDController {
                     <label for="name">Название ${nameCGD1}:</label>
                     <input type="text" id="name" name="name" required>
                     <button type="submit">Добавить ${nameCGD2}</button>
-                </form>
+                </form></div>
 
                 <script>
                     const form = document.getElementById('add-CGD-form');
@@ -240,6 +302,12 @@ class CGDController {
                           input.focus();
                       }
                   });
+
+                  function logout() {
+                    
+                    document.cookie = "token=; Max-Age=0; path=/; SameSite=Lax;"; // Удаляем токен
+                    window.location.href = '/api/v1/auth/loginp'; // Перенаправляем на страницу авторизации
+                }
               </script>
           </body>
           </html>
@@ -266,7 +334,7 @@ class CGDController {
 
 
 
-getAddFilmPage(req, res) {
+async getAddFilmPage(req, res) {
     const html = `
       <!DOCTYPE html>
       <html lang="ru">
@@ -276,8 +344,52 @@ getAddFilmPage(req, res) {
         <title>Добавить фильм</title>
         <style>
           body {
-            font-family: Arial, sans-serif;
-          }
+                  font-family: Arial, sans-serif;
+                  margin: 0;
+                  padding: 0;
+                  background-color: #f4f4f4;
+              }
+                
+              .header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 10px 20px;
+                  background-color: #4CAF50;
+                  color: white;
+              }
+              .header h1 {
+                  margin: 0;
+              }
+              .nav {
+                  margin: 20px;
+                  text-align: center;
+              }
+              .nav a {
+                  margin: 0 15px;
+                  text-decoration: none;
+                  color: #4CAF50;
+                  font-weight: bold;
+              }
+              .nav a:hover {
+                  text-decoration: underline;
+              }
+              .logout-button {
+                  background-color: #f44336; /* Красный цвет для кнопки выхода */
+                  color: white;
+                  border: none;
+                  padding: 10px 15px;
+                  border-radius: 5px;
+                  cursor: pointer;
+              }
+              .logout-button:hover {
+                  background-color: #d32f2f; /* Темнее при наведении */
+              }
+
+              .content {
+                  padding: 20px;
+                  text-align: center;
+              }
           form {
             width: 500px;
             margin: 40px auto;
@@ -333,6 +445,19 @@ getAddFilmPage(req, res) {
         </style>
       </head>
       <body>
+        <div class="header">
+              <h1>Личный кабинет</h1>
+              <button class="logout-button" onclick="logout()">Выход</button>
+              </div>
+
+                <div class="nav">
+                <a href="/api/v1/ms/films/add-page">Добавить фильм</a>
+                <a href="/api/v1/ms/films/list/">Список фильмов</a>
+                <a href="/api/v1/ms/genres/edit-page">Жанры</a>
+                <a href="/api/v1/ms/countries/edit-page">Страны</a>
+                <a href="/api/v1/ms/directors/edit-page">Режиссеры</a>
+                </div>
+        <div class="content">
         <h1>Добавить фильм</h1>
         <form id="add-film-form">
 
@@ -384,7 +509,7 @@ getAddFilmPage(req, res) {
           <input type="text" id="url_playlist" name="url_playlist" required>
 
           <button type="submit">Добавить фильм</button>
-        </form>
+        </form></div>
 
         <script>
           async function loadOptions(url, selectId) {
@@ -498,6 +623,11 @@ getAddFilmPage(req, res) {
               alert('Произошла ошибка при добавлении фильма.');
             });
           });
+          function logout() {
+                    
+                    document.cookie = "token=; Max-Age=0; path=/; SameSite=Lax;"; // Удаляем токен
+                    window.location.href = '/api/v1/auth/loginp'; // Перенаправляем на страницу авторизации
+                }
         </script>
       </body>
       </html>
@@ -568,8 +698,52 @@ getAddFilmPage(req, res) {
         <title>Редактировать фильм</title>
         <style>
           body {
-            font-family: Arial, sans-serif;
-          }
+                  font-family: Arial, sans-serif;
+                  margin: 0;
+                  padding: 0;
+                  background-color: #f4f4f4;
+              }
+                
+              .header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 10px 20px;
+                  background-color: #4CAF50;
+                  color: white;
+              }
+              .header h1 {
+                  margin: 0;
+              }
+              .nav {
+                  margin: 20px;
+                  text-align: center;
+              }
+              .nav a {
+                  margin: 0 15px;
+                  text-decoration: none;
+                  color: #4CAF50;
+                  font-weight: bold;
+              }
+              .nav a:hover {
+                  text-decoration: underline;
+              }
+              .logout-button {
+                  background-color: #f44336; /* Красный цвет для кнопки выхода */
+                  color: white;
+                  border: none;
+                  padding: 10px 15px;
+                  border-radius: 5px;
+                  cursor: pointer;
+              }
+              .logout-button:hover {
+                  background-color: #d32f2f; /* Темнее при наведении */
+              }
+
+              .content {
+                  padding: 20px;
+                  text-align: center;
+              }
           form {
             width: 500px;
             margin: 40px auto;
@@ -614,6 +788,20 @@ getAddFilmPage(req, res) {
         </style>
       </head>
       <body>
+
+        <div class="header">
+              <h1>Личный кабинет</h1>
+              <button class="logout-button" onclick="logout()">Выход</button>
+              </div>
+
+                <div class="nav">
+                <a href="/api/v1/ms/films/add-page">Добавить фильм</a>
+                <a href="/api/v1/ms/films/list">Список фильмов</a>
+                <a href="/api/v1/ms/genres/edit-page">Жанры</a>
+                <a href="/api/v1/ms/countries/edit-page">Страны</a>
+                <a href="/api/v1/ms/directors/edit-page">Режиссеры</a>
+                </div>
+        <div class="content">
         <h1>Редактировать фильм</h1>
         <form id="edit-film-form">
           <label for="type">Тип:</label>
@@ -674,7 +862,7 @@ getAddFilmPage(req, res) {
           <input type="text" id="url_playlist" name="url_playlist" value="${film.url_playlist}" required>
 
           <button type="submit">Обновить фильм</button>
-        </form>
+        </form></div>
 
         <script>
           const form = document.getElementById('edit-film-form');
@@ -745,6 +933,12 @@ getAddFilmPage(req, res) {
               alert('Произошла ошибка при обновлении фильма.');
             });
           });
+
+          function logout() {
+                    
+                    document.cookie = "token=; Max-Age=0; path=/; SameSite=Lax;"; // Удаляем токен
+                    window.location.href = '/api/v1/auth/loginp'; // Перенаправляем на страницу авторизации
+                }
         </script>
       </body>
       </html>
@@ -758,7 +952,196 @@ getAddFilmPage(req, res) {
 }
 
 
+
+
+
+
+async getFilmsPage(req, res) {
+      const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <meta charset="UTF-8">
+          <title>Список фильмов</title>
+          <style>
+              body {
+                  font-family: Arial, sans-serif;
+                  margin: 0;
+                  padding: 0;
+                  background-color: #f4f4f4;
+              }
+              .header {
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding: 10px 20px;
+                  background-color: #4CAF50;
+                  color: white;
+              }
+              .header h1 {
+                  margin: 0;
+              }
+              .nav {
+                  margin: 20px;
+                  text-align: center;
+              }
+              .nav a {
+                  margin: 0 15px;
+                  text-decoration: none;
+                  color: #4CAF50;
+                  font-weight: bold;
+              }
+              .nav a:hover {
+                  text-decoration: underline;
+              }
+              .logout-button {
+                  background-color: #f44336; /* Красный цвет для кнопки выхода */
+                  color: white;
+                  border: none;
+                  padding: 10px 15px;
+                  border-radius: 5px;
+                  cursor: pointer;
+              }
+              .logout-button:hover {
+                  background-color: #d32f2f; /* Темнее при наведении */
+              }
+              .content {
+                  padding: 20px;
+                  text-align: center;
+              }
+              .film-list {
+                  display: flex;
+                  flex-wrap: wrap;
+                  justify-content: center;
+                  padding: 20px;
+              }
+              .film-card {
+                  background-color: white;
+                  border: 1px solid #ccc;
+                  border-radius: 10px;
+                  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                  margin: 10px;
+                  padding: 10px;
+                  width: 200px; /* Ширина карточки */
+                  text-align: center;
+              }
+              .film-card img {
+                  max-width: 100%;
+                  border-radius: 5px;
+              }
+              .film-card h3 {
+                  margin: 10px 0;
+              }
+              .film-card p {
+                  margin: 5px 0;
+              }
+              .pagination {
+                  text-align: center;
+                  margin: 20px 0;
+              }
+              .pagination button {
+                  background-color: #4CAF50;
+                  color: white;
+                  border: none;
+                  padding: 10px 15px;
+                  border-radius: 5px;
+                  cursor: pointer;
+                  margin: 0 5px;
+              }
+              .pagination button:disabled {
+                  background-color: #ccc; /* Серый цвет для отключенной кнопки */
+                  cursor: not-allowed;
+              }
+          </style>
+      </head>
+      <body>
+           <div class="header">
+              <h1>Личный кабинет</h1>
+              <button class="logout-button" onclick="logout()">Выход</button>
+              </div>
+
+                <div class="nav">
+                <a href="/api/v1/ms/films/add-page">Добавить фильм</a>
+                <a href="/api/v1/ms/films/list">Список фильмов</a>
+                <a href="/api/v1/ms/genres/edit-page">Жанры</a>
+                <a href="/api/v1/ms/countries/edit-page">Страны</a>
+                <a href="/api/v1/ms/directors/edit-page">Режиссеры</a>
+                </div>
+                
+          <div class="content">
+              <h1>Список фильмов</h1>
+              
+          
+          <div class="film-list" id="film-list">
+              <!-- Фильмы будут загружены сюда -->
+          </div>
+          <div class="pagination" id="pagination">
+              <button id="prev-button" onclick="fetchFilms(currentPage - 1)" disabled>Предыдущая</button>
+              <button id="next-button" onclick="fetchFilms(currentPage + 1)">Следующая</button>
+          </div>
+          </div>
+          <script>
+              let currentPage = 1; // Текущая страница
+
+              async function fetchFilms(page = 1) {
+                  try {
+                      const response = await fetch('/api/v1/films?page=' + page);
+                      const data = await response.json();
+                      const filmList = document.getElementById('film-list');
+                      filmList.innerHTML = ''; // Очищаем предыдущие фильмы
+
+                      data.films.forEach(film => {
+                          const filmCard = document.createElement('div');
+                          filmCard.className = 'film-card';
+                          filmCard.innerHTML = \`
+                              <img src="\${film.url_poster}" alt="\${film.name}" onerror="this.src='/img/posterError.jpg';">
+                              
+                              <h3>\${film.name}</h3>
+                              <p>Год: \${film.released}</p>
+                              <a href="/api/v1/ms/film/edit-page/\${film.id}">Редактировать</a>
+                          \`;
+                          filmList.appendChild(filmCard);
+                      });
+
+                      // Обновляем текущую страницу
+                      currentPage = page;
+
+                                              // Управляем состоянием кнопок пагинации
+                        document.getElementById('prev-button').disabled = !data.page.current || data.page.current === 1;
+                        document.getElementById('next-button').disabled = !data.page.next;
+
+                    } catch (error) {
+                        console.error('Ошибка при загрузке фильмов:', error);
+                    }
+                }
+
+                function logout() {
+                    
+                    document.cookie = "token=; Max-Age=0; path=/; SameSite=Lax;"; // Удаляем токен
+                    window.location.href = '/api/v1/auth/loginp'; // Перенаправляем на страницу авторизации
+                }
+
+                // Загружаем фильмы при загрузке страницы
+                window.onload = () => fetchFilms(currentPage);
+            </script>
+        </body>
+        </html>
+        `;
+
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'text/html' },
+            body: html,
+        };
+    }
 }
+
+
+
+
+
+
+
 
 
 
