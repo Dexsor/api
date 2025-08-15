@@ -1,3 +1,4 @@
+//userdb.js
 const mongoose = require('mongoose');
 const Schemas = require('./schemas');
 const bcrypt = require('bcrypt');
@@ -39,6 +40,7 @@ class UsersDB {
   async loginUser (username, password) {
     try {
       const user = await this.getUserByUsername(username.toLowerCase());
+      console.log("getUserByUsername = "+ user.password);
       if (!user) {
         return null;
       }

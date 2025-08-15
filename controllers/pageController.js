@@ -1,4 +1,4 @@
-
+//pageController.js
 //////////////CGD controller///////////////
 class CGDController {
  
@@ -434,9 +434,7 @@ async getAddFilmPage(req, res) {
   
 
   .selected-option {
-
     background-color: #4CAF50; /* Цвет фона для выделенных опций */
-
     color: white; /* Цвет текста для выделенных опций */
 
   }
@@ -517,29 +515,17 @@ async getAddFilmPage(req, res) {
     try {
 
       const response = await fetch(url);
-
       if (!response.ok) throw new Error('Сетевая ошибка');
-
       const data = await response.json();
-
       console.log(data);
-
       const select = document.getElementById(selectId);
-
       data.forEach(item => {
-
         const option = document.createElement('option');
-
         option.value = item.id; // Используем id как значение
-
         option.textContent = item.name; // Используем имя как текст
-
         select.appendChild(option);
-
       });
-
     } catch (error) {
-
       console.error('Ошибка загрузки данных:', error);
 
     }
@@ -554,21 +540,13 @@ async getAddFilmPage(req, res) {
 
 
           // Добавляем обработчики событий для выделения опций
-
     const selects = document.querySelectorAll('select[multiple]');
-
     selects.forEach(select => {
-
       select.addEventListener('change', () => {
-
         Array.from(select.options).forEach(option => {
-
           if (option.selected) {
-
             option.classList.add('selected-option'); // Добавляем класс для выделенной опции
-
           } else {
-
             option.classList.remove('selected-option'); // Убираем класс для невыделенной опции
 
           }
@@ -1135,31 +1113,6 @@ async getFilmsPage(req, res) {
         };
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ///////////////////////////////
-
-
-
-
 
 module.exports = CGDController ;

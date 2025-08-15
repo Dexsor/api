@@ -1,3 +1,4 @@
+//filmdb.js
 const mongoose = require('./db');
 const Schemas = require('./schemas');
 
@@ -335,8 +336,9 @@ async getFilm(id) {
       film.video_quality = filmData.video_quality;
       film.url_poster = filmData.url_poster;
       film.url_playlist = filmData.url_playlist;
-      console.log("удалить апд фильм " + film._id);
+      console.log("удалить апд фильм " + film._id + " filmData.genre= "+ filmData.genre);
   
+      if((filmData.genre || filmData.country || filmData.director) !== null){
       // Обновляем связи с жанрами
       await this.FilmGenre.deleteMany({ film_id: film._id }); // Удаляем старые связи
       const filmGenres = filmData.genre.map(genreId => ({
@@ -360,7 +362,12 @@ async getFilm(id) {
         director_id: directorId,
       }));
       await this.FilmDirector.insertMany(filmDirectors); // Сохраняем новые связи
-  
+    }else{
+      film.genre = film.genre;
+      film.country = film.country;
+      film.director = film.director;
+      film.views = filmData.views;
+    }
       // Сохраняем изменения
       await film.save();
   
@@ -705,6 +712,83 @@ async getFilm(id) {
           throw new Error('Ошибка при поиске фильмов: ' + err.message);
       }
   }
+
+  async getUserFilms(userId, skip, limit, filterType = 'history') {
+    try {
+        const query = {};
+        console.log("User  Film IDs from history1111111111111111: =  " +filterType );
+        // Получаем ID фильмов из истории или закладок пользователя
+        let userFilmIds = [];
+        if (filterType === 'history') {
+            userFilmIds = await this.FilmHistory.find({ user_id: userId._id }).distinct('film_id');
+            console.log("User  Film IDs from history: ", userFilmIds);
+
+        } else if (filterType === 'bookmark') {
+            userFilmIds = await this.FilmBookmark.find({ user_id: userId._id }).distinct('film_id');
+
+        }
+
+        // Если нет ID фильмов, возвращаем пустой результат
+        if (userFilmIds.length === 0) {
+            return { films: [], count: 0 };
+        }
+
+        // Добавляем ID фильмов в запрос
+        query._id = { $in: userFilmIds };
+
+        // Получение общего количества фильмов
+        const totalCount = userFilmIds.length;
+        let sort = {};
+        sort._id = -1;
+        // Получаем фильмы с учетом фильтров и пагинации
+        const films = await this.Film.find(query)
+            .sort(sort)
+            .skip(skip)
+            .limit(limit)
+            .populate('genre') // Заполнение данных о жанрах
+            .populate('director') // Заполнение данных о режиссере
+            .populate('country'); // Заполнение данных о стране
+
+        // Преобразуем фильмы для удобного вывода
+        const transformedFilms = await Promise.all(films.map(async (film) => {
+            const filmGenres = await this.FilmGenre.find({ film_id: film._id }).populate('genre_id');
+            const genres = filmGenres.map(fg => fg.genre_id.name).join(', ');
+
+            const filmCountries = await this.FilmCountry.find({ film_id: film._id }).populate('country_id');
+            const countries = filmCountries.map(fc => fc.country_id.name).join(', ');
+
+            const filmDirectors = await this.FilmDirector.find({ film_id: film._id }).populate('director_id');
+            const directors = filmDirectors.map(fd => fd.director_id.name).join(', ');
+
+            return {
+                id: film.id,
+                type: film.type,
+                name: film.name,
+                originalname: film.originalname,
+                released: film.released,
+                description: film.description,
+                director: directors || 'Неизвестный режиссер',
+                country: countries || 'Неизвестная страна',
+                genre: genres || 'Нет жанров',
+                age: film.age,
+                video_quality: film.video_quality,
+                url_poster: film.url_poster,
+                url_playlist: film.url_playlist,
+                rating: film.rating,
+                views: film.views,
+            };
+        }));
+
+        // Возвращаем объект с фильмами и количеством
+        return {
+            films: transformedFilms || [],
+            count: totalCount
+        };
+    } catch (err) {
+        console.error('Ошибка при получении фильмов:', err);
+        return { films: [], count: 0 };
+    }
+}
       
     }
       module.exports = FilmsDB;

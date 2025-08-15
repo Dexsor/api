@@ -1,4 +1,5 @@
 //REST API
+//server.js
 
 //импорт модулей
 const http = require('http');
@@ -11,8 +12,8 @@ const filmsDB = new FilmsDB();
 //const addFilmsPagecontroller = require('./pagecreate/addFilmsPagecontroller');//страница добавить фильм
 //const filmController = new addFilmsPagecontroller();
 
-const authPageController = require('./pagecreate/authPageController');//страницы авторизации
-const  PageController  = require('./pagecreate/pageController');
+const authPageController = require('./controllers/authPageController');//страницы авторизации
+const  PageController  = require('./controllers/pageController');
 const pageController = new PageController();
 
 
@@ -53,7 +54,7 @@ function sendResponse(response, options) {
   // Устанавливаем заголовки по умолчанию
   options.headers = options.headers || {};
   options.headers['Access-Control-Allow-Credentials'] = 'true'; // Разрешаем отправку куки
-  options.headers['Access-Control-Allow-Origin'] = 'http://127.0.0.1:51218'; //CORS разрешаем этому домену обращение к нам
+  options.headers['Access-Control-Allow-Origin'] = 'http://127.0.0.1:56769'; //CORS разрешаем этому домену обращение к нам
   options.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization';
   options.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'; // Разрешаем методы
 
@@ -140,6 +141,65 @@ function getApiInfo(request, response) {
     description: 'Это базовое API для работы с фильмами'
   };
   sendResponse(response, successResponse(apiInfo));
+}
+
+//получение списка фильмов по 5 шт на каждой странице
+async function getUserFilms(request, response, query, userid, filterType ) {
+  const queryParams = new URLSearchParams(query);
+  console.log("апи ссылка1/1 = " + queryParams.toString());
+  console.log("апи ссылка2/2 = " + queryParams.toString().replace(query.page,'').replace('page=',''));
+ 
+  const page = parseInt(queryParams.get('page')) || 1; // Получаем номер страницы
+  const limit = 6;
+  const skip = (page - 1) * limit;
+  
+
+ // Параметры для поиска
+
+ const type = query.type || null; // Тип карточки : фильм, сериал
+ const name = query.name || null; // Название фильма для поиска
+ const released = query.released || null; // Год релиза 
+ const genreName = query.genre || null; // Имя жанра для фильтрации
+ const director = query.director || null; // Имя режиссера для фильтрации
+ const country = query.country || null; // Страна для фильтрации
+ const age = query.age || null; // Возрастной ценз
+ const rating = query.rating || null; // Рейтинг
+ const views = query.views || null; // Просмотры
+ const news = query.new || null; // Новинки
+ const popular = query.popular|| null; // Популярные
+ const category = query.category || null; // Популярные
+ 
+let typeName = "movie";
+  let { films, count } = await filmsDB.getUserFilms(userid, skip, limit,  filterType );
+
+ 
+     console.log("кол-во карточек = " + count);
+     console.log("1111filterType = " + filterType);
+    if (films) {
+    // Извлекаем текущие параметры запроса
+    // Устанавливаем параметры для следующей страницы
+    const nextPage = page < Math.ceil(count / limit) ? `${baseUrl}/api/v1/user/${filterType}?${queryParams.toString().replace(query.page,'').replace('page=','')}&page=${page + 1}` : null;
+    
+    const data = {
+      films,
+      page: {
+        current: page,
+        next: nextPage
+      },
+      films: films.map((film) => ({
+        id: film.id,
+        type: film.type,
+        name: film.name,
+        released: film.released,
+        url_poster: film.url_poster,
+        url_playlist: `${baseUrl}/api/v1/films/${film.id}`
+
+      }))
+    };
+    sendResponse(response, successResponse(data));
+  } else {
+    sendResponse(response, error404);
+  }
 }
 
 //получение списка фильмов по 5 шт на каждой странице
@@ -451,7 +511,7 @@ async function deleteCGD(request, response, id, type) {
 
 
 //функция регистрации пользователя
-async function registerUser     (request, response) {
+async  function registerUser     (request, response) {
   let body = '';
   request.on('data', (chunk) => {
     body += chunk;
@@ -585,7 +645,7 @@ async function loginUser (request, response) {
   //создание сервера
   const server = http.createServer( async(request, response) => {
     if (request.method === 'OPTIONS') { //CORS is pain =(
-      response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:51218');
+      response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:56769');
       response.setHeader('Access-Control-Allow-Credentials', 'true');
       response.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
       response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -609,7 +669,20 @@ async function loginUser (request, response) {
       response.setHeader('Set-Cookie', 'token=; Max-Age=0; path=/;  SameSite=Lax;');
       sendResponse(response, successResponse({ message: 'Вы успешно вышли из системы' }));
     },
-   
+    '/api/v1/user/bookmark': async (request, response) => {
+      authenticate(request, response, async() => {
+        // Если аутентификация прошла успешно, отправляем ответ
+        const userid =  await usersDB.getUserBy_Id(request.user.id);
+        await  getUserFilms(request, response, query, userid, "bookmark" ) 
+        });
+    },
+    '/api/v1/user/history': async (request, response) => {
+      authenticate(request, response, async() => {
+        // Если аутентификация прошла успешно, отправляем ответ
+        const userid =  await usersDB.getUserBy_Id(request.user.id);
+        await  getUserFilms(request, response, query, userid, "history" ) 
+        });
+    },
     '/api/v1/films': (request, response) => getFilms(request, response, query),
     
     '/api/v1/ms/films/add': await addFilm ,
@@ -719,12 +792,16 @@ async function loginUser (request, response) {
     },
 
     '/api/v1/auth/lk': async (request, response) => {
+      await authenticate(request, response, async () => {
       const result = await authPageController.getDashboardPage(request, response);
       sendResponse(response, result);
+    });
     },
     '/api/v1/ms/films/list': async (request, response) => {
+      await authenticate(request, response, async () => {
       const result = await pageController.getFilmsPage(request, response);
       sendResponse(response, result);
+    });
     },
     
     // Жанры
@@ -796,6 +873,12 @@ if (path in routes) {
       const filmId = requestPath.split('/').pop(); // Получаем ID фильма из URL
       console.log(`Получен ID фильма: ${filmId}`);
       const filmRecord = await filmsDB.getFilm(filmId); // Получаем запись фильма из базы данных
+      
+      filmRecord.views = (filmRecord.views + Number(1));
+      filmRecord.genre = null;
+      filmRecord.country = null;
+      filmRecord.director = null;
+      await filmsDB.updateFilm(filmId, filmRecord);
       if (!filmRecord) {
           console.log("Фильм не найден в базе данных");
           response.writeHead(404, { 'Content-Type': 'application/json' });
@@ -935,7 +1018,7 @@ if (path in routes) {
     if (request.method === 'GET') {
        // await authenticate(request, response, async () => {
             // Выполняем поиск фильмов
-            await searchFilms(request, response, query); // Убедитесь, что передаете request.query
+            await searchFilms(request, response, query); 
      //   });
     } else {
         sendResponse(response, error404); // Если метод не поддерживается, возвращаем ошибку
@@ -950,3 +1033,4 @@ if (path in routes) {
 server.listen(3000, () => {
   console.log('Сервер запущен на порту 3000');
 });
+module.exports = server

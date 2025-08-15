@@ -1,3 +1,4 @@
+//schemas.js
 // создание схем 
 const mongoose = require('mongoose');
 

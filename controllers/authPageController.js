@@ -1,3 +1,4 @@
+//authPageController.js
 class authPageController {
   static async getRegisterPage(req, res) {
     const html = `
